@@ -8,7 +8,7 @@ class _netG(nn.Module):
         self.ngpu = opt.ngpu
         self.model = nn.Sequential(
             # conv1
-            nn.Conv2d(opt.nc+1,opt.nef,5,1,1, bias=False),
+            nn.Conv2d(4,opt.nef,5,1,1, bias=False),
             nn.BatchNorm2d(opt.nef),
             nn.ReLU(),
             # conv2
@@ -71,11 +71,8 @@ class _netG(nn.Module):
 
     def forward(self, input):
         output = self.model(input)
-        mask = input[:, 3]
-        mask = torch.unsqueeze(mask, 1)
-        input_image = input[:, :3]
-        out = (1 - mask) * output + mask * input_image
-        return out
+
+        return output
 
 
 class _netlocalD(nn.Module):
@@ -143,13 +140,14 @@ class _netlocalD(nn.Module):
         out_global = fc_global(out_global)
 
         for i in range(batch_size) :
-            one = mask_tensor[i, :, :, :]
-            loc = np.argwhere(np.asarray(1 - mask_tensor[i, :, :, :]) > 0)
-
+            one = mask_tensor[i, :, :, :].cpu().numpy()
+            loc = np.argwhere(np.asarray(1 - one) > 0)
             ( _, ystart, xstart) = loc.min(0)
             ( _, ystop, xstop) = loc.max(0) + 1
-
-            crop_local = torch.unsqueeze(input_global[i, :, ystart:ystop, xstart:xstop], 0)
+            crop_local = torch.zeros((1, 3, 256, 256)).cuda()
+            crop_local[0, :, 0:ystop-ystart, 0:xstop-xstart] = input_global[i, :, ystart:ystop, xstart:xstop]
+            # crop_local = torch.unsqueeze(crop_local, 0)
+            # crop_local = torch.unsqueeze(input_global[i, :, ystart:ystop, xstart:xstop], 0)
             if i == 0 :
                 batch_local= crop_local
             else :
